@@ -1,4 +1,3 @@
-import copy
 import ray
 
 
@@ -35,7 +34,8 @@ class Graph(object):
             self.rows[key] = \
                 [_GraphRow(oid, local_keys, foreign_keys, transaction_id)]
         else:
-            temp_row = self.rows[key][-1].update_oid(oid, transaction_id)
+            temp_row = self.rows[key][-1].copy(oid=oid,
+                                               transaction_id=transaction_id)
             temp_row = temp_row.add_local_keys(transaction_id, local_keys)
             temp_row = temp_row.add_foreign_keys(transaction_id, foreign_keys)
             self.rows[key].append(temp_row)
@@ -69,7 +69,6 @@ class Graph(object):
     def add_local_keys(self, transaction_id, key, *local_keys):
         """Adds one or more local keys.
         """
-        raise ValueError(str(type(key)))
         if key not in self.rows:
             graph_row = _GraphRow().add_local_keys(transaction_id, local_keys)
         else:
@@ -209,7 +208,16 @@ class _GraphRow(object):
             "Transactions arrived out of order."
 
         if transaction_id > self._transaction_id:
-            new_keys = copy.deepcopy(self.foreign_keys)
+            """
+            TODO: Find an efficient way to make a deepcopy.
+            A deepcopy will be needed if the new transaction id is larger then
+            the current transaction id in order to ensure that the previous
+            transaction records are not updated(overwritten) with the new
+            transaction data
+            """
+            new_keys = {}
+            for graph_id in self.foreign_keys:
+                new_keys[graph_id] = self.foreign_keys[graph_id]
         else:
             new_keys = self.foreign_keys
 
@@ -248,11 +256,18 @@ class _GraphRow(object):
         """
         assert transaction_id >= self._transaction_id, \
             "Transactions arrived out of order."
-        assert type(values) is dict, \
-            "Foreign keys must be dicts: {destination_graph: key}"
 
         if transaction_id > self._transaction_id:
-            new_keys = copy.deepcopy(self.foreign_keys)
+            """
+            TODO: Find an efficient way to make a deepcopy.
+            A deepcopy will be needed if the new transaction id is larger then
+            the current transaction id in order to ensure that the previous
+            transaction records are not updated(overwritten) with the new
+            transaction data
+            """
+            new_keys = {}
+            for graph_id in self.foreign_keys:
+                new_keys[graph_id] = self.foreign_keys[graph_id]
         else:
             new_keys = self.foreign_keys
 
@@ -309,7 +324,7 @@ def _apply_append(collection, values):
     try:
         collection.update(values)
         return collection
-    except ValueError:
+    except TypeError:
         for val in values:
             collection.update(val)
 
