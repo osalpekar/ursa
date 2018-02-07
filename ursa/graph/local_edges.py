@@ -91,12 +91,12 @@ class LocalEdges(object):
                 temp_edge_list.append(edge)
 
         self.edges = np.array([])
-        for i in xrange(0, len(temp_edge_list), MAX_SUBLIST_SIZE):
+        for i in range(0, len(temp_edge_list), MAX_SUBLIST_SIZE):
             x_oid = ray.put(list[i:i + MAX_SUBLIST_SIZE])
             self.edges.append(x_oid)
 
         temp_set = None
-        temp_edges_list = None
+        temp_edge_list = None
 
     @ray.remote
     def get_global_sampling(self):
@@ -110,21 +110,48 @@ class LocalEdges(object):
 
     @ray.remote
     def get_partitions(self):
-        indices = [i*(0.01 * MAX_SUBLIST_SIZE * len(self.edges)) for i in range(1,len(self.edges))]
-        partitions_list = []
+        indices = [i*(0.01 * MAX_SUBLIST_SIZE) 
+                   for i in range(1, len(self.edges))]
         global_sample_list_oid = self.get_global_sampling
         return [global_sample_list_oid[i] for i in indices]
 
     @ray.remote
-    def partition_sublists(self):
+    def partition_sublists(self, list_oid):
 
         partion_bounds = self.get_partitions()
-        
+        partitioned_sublist = [[] for i in range(len(partitions_bounds + 1))]
+        for edge in list_oid:
+            if edge.destination <= partition_bounds[0]:
+                partitioned_sublist[0].append(edge)
+            if edge.destination > partition_bounds[-1]:
+                partitioned_sublist[-1].append(edge)
+            for i in range(1, len(partition_bounds) - 1):
+                if edge.destination > partition_bounds[i] and 
+                   edge.destination <= partition_bounds[i + 1]:
+                    paritioned_sublist[i].append(edge)
+        partition_oids = np.array([])
+        for sublist in partitioned_sublist:
+            np.append(partition_oids,
+                      ray.put(sublist))
+        return partition_oids
         # case statement to compare each value in the list to the bound
         # at this point you have list of sublists
         # return that list of sublists
 
+    # TODO: How to send this function to a remote object - is it just pass oid
+    # as argument?
     @ray.remote
     def merge_common_partitions(self):
+        merged_oid_groupings = []
+        new_local_edges = np.array([])
         for list_oid in self.local_edges:
-            partitions_oid = partition_sublists()
+            merged_oid_groupings.append(self.partition_sublists.remote(list_oid))
+
+        for i in range(len(merged_oid_groupings[0])):
+            new_partition = np.array([])
+            for j in range(len(merged_oid_groupings)):
+                np.append(new_partition,
+                          ray.get(merged_oid_groupings[j][i]))
+            new_partition_oid = ray.put(new_partition)
+            np.append(new_local_edges, new_partition_oid)
+        self.edges = new_local_edges
