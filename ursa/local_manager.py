@@ -8,6 +8,7 @@ class GraphManager(object):
         self.graph_dict = {}
         self._graph_config = {}
         self._transaction_id = 0
+        self._graph_config['versions_to_store'] = 5
 
     def update_transaction_id(self):
         """Updates the transaction ID with that of the global graph manager."""
@@ -228,10 +229,16 @@ class GraphManager(object):
         """
         second_split = self.graph_dict[graph_id].split.remote()
         t_id = ray.get(self.graph_dict[graph_id].getattr.remote(
-                "_creation_transaction_id"))
+                       "_creation_transaction_id"))
         self.graph_dict[graph_id] = \
             [self.graph_dict[graph_id],
-             ug.Graph.remote(t_id, second_split)]
+             ug.Graph.remote(t_id, vertices=second_split)]
+
+    def clean_old_rows(self):
+        """Background process to spill old rows to disk
+        """
+        for g_id, g in self.graph_dict.items():
+            g.clean_old_rows(g_id, self._graph_config['versions_to_store'])
 
 
 @ray.remote
