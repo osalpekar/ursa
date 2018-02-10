@@ -110,33 +110,28 @@ class LocalEdges(object):
 
     @ray.remote
     def get_partitions(self):
-        indices = [i*(0.01 * MAX_SUBLIST_SIZE) 
+        indices = [i*(0.01 * MAX_SUBLIST_SIZE)
                    for i in range(1, len(self.edges))]
         global_sample_list_oid = self.get_global_sampling
         return [global_sample_list_oid[i] for i in indices]
 
     @ray.remote
     def partition_sublists(self, list_oid):
-
-        partion_bounds = self.get_partitions()
-        partitioned_sublist = [[] for i in range(len(partitions_bounds + 1))]
+        partition_bounds = self.get_partitions()
+        partitioned_sublist = [[] for i in range(len(partition_bounds + 1))]
         for edge in list_oid:
             if edge.destination <= partition_bounds[0]:
                 partitioned_sublist[0].append(edge)
             if edge.destination > partition_bounds[-1]:
                 partitioned_sublist[-1].append(edge)
             for i in range(1, len(partition_bounds) - 1):
-                if edge.destination > partition_bounds[i] and 
-                   edge.destination <= partition_bounds[i + 1]:
-                    paritioned_sublist[i].append(edge)
+                if edge.destination > partition_bounds[i] and \
+                        edge.destination <= partition_bounds[i + 1]:
+                    partitioned_sublist[i].append(edge)
         partition_oids = np.array([])
         for sublist in partitioned_sublist:
-            np.append(partition_oids,
-                      ray.put(sublist))
+            np.append(partition_oids, ray.put(sublist))
         return partition_oids
-        # case statement to compare each value in the list to the bound
-        # at this point you have list of sublists
-        # return that list of sublists
 
     # TODO: How to send this function to a remote object - is it just pass oid
     # as argument?
@@ -145,7 +140,8 @@ class LocalEdges(object):
         merged_oid_groupings = []
         new_local_edges = np.array([])
         for list_oid in self.local_edges:
-            merged_oid_groupings.append(self.partition_sublists.remote(list_oid))
+            merged_oid_groupings.append(
+                self.partition_sublists.remote(list_oid))
 
         for i in range(len(merged_oid_groupings[0])):
             new_partition = np.array([])
