@@ -103,3 +103,9 @@ ENV/
 # intellij
 .idea/
 *.iml
+
+# macOS files
+.DS_Store
+
+# Serialization outputs
+graph1/
