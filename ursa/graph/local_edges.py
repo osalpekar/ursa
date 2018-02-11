@@ -2,7 +2,7 @@ import ray
 import numpy as np
 from .utils import _filter_remote
 
-MAX_SUBLIST_SIZE = 10
+MAX_SUBLIST_SIZE = 2
 
 
 class LocalEdges(object):
@@ -137,9 +137,17 @@ class LocalEdges(object):
     # as argument?
     @ray.remote
     def merge_common_partitions(self):
+        # temp
+        # new_edges = np.array([])
+        # for list_oid in self.edges:
+        #     new_oid = ray.put(ray.get(list_oid).sort())
+        #     np.append(new_edges, new_oid)
+        # self.edges = new_edges
+        # return
+        # real
         merged_oid_groupings = []
         new_local_edges = np.array([])
-        for list_oid in self.local_edges:
+        for list_oid in self.edges:
             merged_oid_groupings.append(
                 self.partition_sublists.remote(list_oid))
 
@@ -148,6 +156,6 @@ class LocalEdges(object):
             for j in range(len(merged_oid_groupings)):
                 np.append(new_partition,
                           ray.get(merged_oid_groupings[j][i]))
-            new_partition_oid = ray.put(new_partition)
+            new_partition_oid = ray.put(new_partition.sort())
             np.append(new_local_edges, new_partition_oid)
         self.edges = new_local_edges
