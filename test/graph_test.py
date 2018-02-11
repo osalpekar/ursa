@@ -127,11 +127,18 @@ def test_add_multiple_local_edges():
                         transaction_id)
     graph.add_local_edges.remote(transaction_id, key, "Key2", "Key3", "Key4")
 
-    r = ray.get(graph.select_local_edges.remote(transaction_id, key))
-    c = ray.get(r[0])
-    c.extend(r[1])
-    final = [obj for l in c for obj in l]
-    final.sort()
+    # r = ray.get(graph.select_local_edges.remote(transaction_id, key))
+    # c = ray.get(r[0])
+    # c.extend(r[1])
+    # final = [obj for l in c for obj in l]
+    # final.sort()
+    # assert final == ["Key2", "Key3", "Key4"]
+    edge_oid, buffer_oid = graph.select_local_edges.remote(transaction_id, key)
+    edges = ray.get(ray.get(edge_oid))
+    # c = ray.get(r[0])
+    # edges.extend(ray.get(buffer_oid))
+    final = [ray.get(obj) for l in edges for obj in l]
+    # final.sort()
     assert final == ["Key2", "Key3", "Key4"]
 
 
@@ -246,3 +253,24 @@ def test_non_existant_vertex():
                         transaction_id)
 
     assert "Key9999" not in ray.get(graph.select_vertex.remote(transaction_id))
+
+
+def test_clean_local_edges():
+    graph = init_test()
+    key = "Key1"
+    vertex_data = "Value1"
+    local_edges = set()
+    foreign_edges = {}
+    transaction_id = 0
+    graph.insert.remote(key, vertex_data, local_edges, foreign_edges,
+                        transaction_id)
+    graph.add_local_edges.remote(transaction_id, key,
+                                 "Key5", "Key3", "Key4", "Key2")
+
+    r = ray.get(graph.select_local_edges.remote(transaction_id, key))
+    c = ray.get(r[0])
+    c.extend(r[1])
+    final = [obj for l in c for obj in l]
+    assert final == ["Key5", "Key3", "Key4", "Key2"]
+    graph.clean_local_edges.remote("Key1")
+    assert final == ["Key2", "Key3", "Key4", "Key5"]
