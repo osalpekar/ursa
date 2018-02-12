@@ -249,3 +249,6 @@ class Graph(object):
             self.rows[k] = rows[-versions_to_store:]
             rows_to_write = rows[:-versions_to_store]
             [write_vertex(r, graph_id, k) for r in rows_to_write]
+
+    def clean_local_edges(self, key):
+        self.vertices[key][-1].clean_local_edges()

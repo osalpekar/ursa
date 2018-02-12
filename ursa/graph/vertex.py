@@ -162,6 +162,9 @@ class _Vertex(object):
         """
         return self.vertex_data is not None
 
+    def clean_local_edges(self):
+        self.local_edges.merge_common_partitions.remote()
+
 
 class _DeletedVertex(_Vertex):
     def __init__(self, transaction_id):
