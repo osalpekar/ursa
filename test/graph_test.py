@@ -251,6 +251,7 @@ def test_non_existant_vertex():
 
     assert "Key9999" not in ray.get(graph.select_vertex.remote(transaction_id))
 
+
 def flatten(x):
     result = []
     for el in x:
