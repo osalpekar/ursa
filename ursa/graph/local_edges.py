@@ -18,12 +18,20 @@ class LocalEdges(object):
 
         @param edges: One or more edges to initialize this object.
         """
-        self.edges = \
-            [obj for obj in edges if type(obj) is ray.local_scheduler.ObjectID]
+        self.edges = []
+        self.buf = np.array([])
+        for obj in edges:
+            if type(obj) is ray.local_scheduler.ObjectID:
+                self.edges.append(obj)
+            elif type(obj) is list:
+                for item in obj:
+                    if type(item) is ray.local_scheduler.ObjectID:
+                        self.edges.append(item)
+                    else:
+                        self.buf = np.append(self.buf, item)
+            else:
+                self.buf = np.append(self.buf, obj)
 
-        self.buf = \
-            np.array([obj for obj in edges
-                      if type(obj) is not ray.local_scheduler.ObjectID])
         if len(self.buf) > MAX_SUBLIST_SIZE:
             self.edges.append(ray.put(self.buf))
             self.buf = np.array([])
@@ -44,7 +52,7 @@ class LocalEdges(object):
                        if type(val) is not ray.local_scheduler.ObjectID])
 
         if len(temp_buf) > MAX_SUBLIST_SIZE:
-            temp_edges.append(ray.put(self.buf))
+            temp_edges.append(ray.put(temp_buf))
             temp_buf = np.array([])
 
         temp_edges.extend(temp_buf)
