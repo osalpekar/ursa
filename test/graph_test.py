@@ -1,6 +1,7 @@
 import ursa
 import pytest
 import ray
+import collections
 
 ray.init()
 
@@ -46,7 +47,7 @@ def test_insert_with_local_edges():
     r = ray.get(graph.select_local_edges.remote(transaction_id, key))
     c = ray.get(r[0])
     c.extend(r[1])
-    final = [obj for l in c for obj in l]
+    final = flatten(c)
     final.sort()
     assert final == ["Key2", "Key3"]
 
@@ -78,7 +79,7 @@ def test_insert_with_local_and_foreign_edges():
     graph = init_test()
     key = "Key1"
     vertex_data = "Value1"
-    local_edges = set(["Key2", "Key3"])
+    local_edges = ["Key2", "Key3"]
     foreign_edges = {"Other Graph": "Other Key"}
     transaction_id = 0
     graph.insert.remote(key, vertex_data, local_edges, foreign_edges,
@@ -90,7 +91,7 @@ def test_insert_with_local_and_foreign_edges():
     r = ray.get(graph.select_local_edges.remote(transaction_id, key))
     c = ray.get(r[0])
     c.extend(r[1])
-    final = [obj for l in c for obj in l]
+    final = flatten(c)
     final.sort()
     assert final == ["Key2", "Key3"]
 
@@ -112,7 +113,7 @@ def test_add_single_local_key():
     r = ray.get(graph.select_local_edges.remote(transaction_id, key))
     c = ray.get(r[0])
     c.extend(r[1])
-    final = [obj for l in c for obj in l]
+    final = flatten(c)
     assert final == ["Key2"]
 
 
@@ -125,14 +126,17 @@ def test_add_multiple_local_edges():
     transaction_id = 0
     graph.insert.remote(key, vertex_data, local_edges, foreign_edges,
                         transaction_id)
-    graph.add_local_edges.remote(transaction_id, key, "Key2", "Key3", "Key4")
+    graph.add_local_edges.remote(transaction_id, key, "Key02", "Key03",
+                                 "Key04", "Key05", "Key06", "Key07", "Key08",
+                                 "Key09", "Key10", "Key11", "Key12", "Key13")
 
     r = ray.get(graph.select_local_edges.remote(transaction_id, key))
     c = ray.get(r[0])
     c.extend(r[1])
-    final = [obj for l in c for obj in l]
+    final = flatten(c)
     final.sort()
-    assert final == ["Key2", "Key3", "Key4"]
+    assert final == ["Key02", "Key03", "Key04", "Key05", "Key06", "Key07",
+                     "Key08", "Key09", "Key10", "Key11", "Key12", "Key13"]
 
 
 def test_add_single_foreign_edge():
@@ -246,3 +250,12 @@ def test_non_existant_vertex():
                         transaction_id)
 
     assert "Key9999" not in ray.get(graph.select_vertex.remote(transaction_id))
+
+def flatten(x):
+    result = []
+    for el in x:
+        if isinstance(x, collections.Iterable) and not isinstance(el, str):
+            result.extend(flatten(el))
+        else:
+            result.append(el)
+    return result
