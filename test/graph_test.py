@@ -311,10 +311,11 @@ def test_clean_flushed_local_edges():
     # print c
     final_sorted = flatten(c)
     # print final_sorted
-    assert final_sorted == ["Key02", "Key03", "Key04", "Key05", "Key06", "Key07",
-                     "Key08", "Key09", "Key10", "Key11", "Key12", "Key13", "Key14",
-                     "Key15", "Key16", "Key17", "Key18", "Key19", "Key20",
-                     "Key21", "Key24", "Key23", "Key22"]
+    assert final_sorted == ["Key02", "Key03", "Key04", "Key05", "Key06",
+                            "Key07", "Key08", "Key09", "Key10", "Key11",
+                            "Key12", "Key13", "Key14", "Key15", "Key16",
+                            "Key17", "Key18", "Key19", "Key20", "Key21",
+                            "Key24", "Key23", "Key22"]
 
 
 def flatten(x):

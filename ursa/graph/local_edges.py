@@ -128,7 +128,6 @@ class LocalEdges(object):
         new_local_edges = []
 
         partition_bounds = self.get_partitions()
-        print partition_bounds
         merged_oid_groupings = [self.partition_sublists(list_oid,
                                 partition_bounds) for list_oid in self.edges]
 
