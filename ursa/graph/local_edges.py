@@ -1,8 +1,10 @@
 import ray
 import numpy as np
 from .utils import _filter_remote
+import collections
 
 MAX_SUBLIST_SIZE = 10
+SAMPLING_COEFFICIENT = 0.1
 
 
 class LocalEdges(object):
@@ -32,7 +34,7 @@ class LocalEdges(object):
             else:
                 self.buf = np.append(self.buf, obj)
 
-        if len(self.buf) > MAX_SUBLIST_SIZE:
+        if len(self.buf) >= MAX_SUBLIST_SIZE:
             self.edges.append(ray.put(self.buf))
             self.buf = np.array([])
 
@@ -44,6 +46,8 @@ class LocalEdges(object):
         @return: A list of edges including the new appended values.
         """
         temp_edges = self.edges[:]
+        # TODO: might need to change the below assigments to how it is done in
+        # the __init__ function
         temp_edges.extend([val for val in values
                            if type(val) is ray.local_scheduler.ObjectID])
         temp_buf = \
@@ -51,7 +55,7 @@ class LocalEdges(object):
                       [val for val in values
                        if type(val) is not ray.local_scheduler.ObjectID])
 
-        if len(temp_buf) > MAX_SUBLIST_SIZE:
+        if len(temp_buf) >= MAX_SUBLIST_SIZE:
             temp_buf = self.prune_buffer(temp_buf)
             temp_buf.sort()
             temp_edges.append(ray.put(temp_buf))
@@ -87,57 +91,62 @@ class LocalEdges(object):
         temp_set = None
         return temp_buf
 
-    @ray.remote
     def get_global_sampling(self):
-        sample_list = np.array([])
-        num_sublist_samples = 0.01 * MAX_SUBLIST_SIZE
-        for list_oid in self.edges:
-            sample_list = np.append(sample_list,
-                                    np.random.choice(list_oid,
-                                                     num_sublist_samples))
+        num_samples = int(SAMPLING_COEFFICIENT * MAX_SUBLIST_SIZE)
+        sample_list = [np.random.choice(ray.get(list_oid), num_samples)
+                       for list_oid in self.edges]
+        sample_list = self.flatten(sample_list)
         sample_list.sort()
         return sample_list
 
-    @ray.remote
     def get_partitions(self):
-        indices = [i*(0.01 * MAX_SUBLIST_SIZE)
-                   for i in range(1, len(self.edges))]
-        global_sample_list_oid = self.get_global_sampling
-        return [global_sample_list_oid[i] for i in indices]
+        indices = [int(i*(SAMPLING_COEFFICIENT * MAX_SUBLIST_SIZE))
+                   for i in range(len(self.edges))]
+        sample_list = self.get_global_sampling()
+        return [sample_list[i] for i in indices]
 
-    @ray.remote
-    def partition_sublists(self, list_oid):
-        partition_bounds = self.get_partitions()
-        partitioned_sublist = [[] for i in range(len(partition_bounds + 1))]
-        for edge in list_oid:
-            if edge.destination <= partition_bounds[0]:
+    def partition_sublists(self, list_oid, partition_bounds):
+        partitioned_sublist = [[] for i in range(len(partition_bounds) + 1)]
+        for edge in ray.get(list_oid):
+            if edge <= partition_bounds[0]:
                 partitioned_sublist[0].append(edge)
-            if edge.destination > partition_bounds[-1]:
+            if edge > partition_bounds[-1]:
                 partitioned_sublist[-1].append(edge)
-            for i in range(1, len(partition_bounds) - 1):
-                if edge.destination > partition_bounds[i] and \
-                       edge.destination <= partition_bounds[i + 1]:
+            for i in range(1, len(partition_bounds)):
+                if edge > partition_bounds[i - 1] and \
+                       edge <= partition_bounds[i]:
                     partitioned_sublist[i].append(edge)
-        partition_oids = np.array([])
-        for sublist in partitioned_sublist:
-            partition_oids = np.append(partition_oids, ray.put(sublist))
-        return partition_oids
+        return partitioned_sublist
 
-    @ray.remote
     def merge_common_partitions(self):
         # TODO: How to send this function to a remote object - is it just pass
         # oid as argument?
-        merged_oid_groupings = []
-        new_local_edges = np.array([])
-        for list_oid in self.edges:
-            merged_oid_groupings.append(
-                self.partition_sublists.remote(list_oid))
+        if len(self.edges) == 0:
+            self.buf.sort()
+            return self.buf
+
+        new_local_edges = []
+
+        partition_bounds = self.get_partitions()
+        print partition_bounds
+        merged_oid_groupings = [self.partition_sublists(list_oid,
+                                partition_bounds) for list_oid in self.edges]
 
         for i in range(len(merged_oid_groupings[0])):
-            new_partition = np.array([])
+            new_partition = []
             for j in range(len(merged_oid_groupings)):
-                new_partition = np.append(new_partition,
-                                          ray.get(merged_oid_groupings[j][i]))
-                new_partition_oid = ray.put(new_partition.sort())
-                np.append(new_local_edges, new_partition_oid)
-        self.edges = new_local_edges
+                new_partition.extend(merged_oid_groupings[j][i])
+            new_partition.sort()
+            new_partition_oid = ray.put(new_partition)
+            new_local_edges.append(new_partition_oid)
+        new_local_edges.extend(self.buf)
+        return new_local_edges
+
+    def flatten(self, x):
+        result = []
+        for el in x:
+            if isinstance(x, collections.Iterable) and not isinstance(el, str):
+                result.extend(self.flatten(el))
+            else:
+                result.append(el)
+        return result

@@ -163,7 +163,10 @@ class _Vertex(object):
         return self.vertex_data is not None
 
     def clean_local_edges(self):
-        self.local_edges.merge_common_partitions.remote()
+        new_local_edges = self.local_edges.merge_common_partitions()
+        # print self.local_edges.buf
+        # print ray.get(new_local_edges)
+        return self.copy(local_edges=new_local_edges)
 
 
 class _DeletedVertex(_Vertex):

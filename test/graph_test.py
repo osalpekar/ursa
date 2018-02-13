@@ -252,7 +252,7 @@ def test_non_existant_vertex():
     assert "Key9999" not in ray.get(graph.select_vertex.remote(transaction_id))
 
 
-def test_clean_local_edges():
+def test_clean_buffered_local_edges():
     graph = init_test()
     key = "Key1"
     vertex_data = "Value1"
@@ -271,8 +271,50 @@ def test_clean_local_edges():
     assert final == ["Key5", "Key3", "Key4", "Key2"]
     graph.clean_local_edges.remote("Key1")
     r = ray.get(graph.select_local_edges.remote(transaction_id, key))
-    print r
-    assert final == ["Key2", "Key3", "Key4", "Key5"]
+    c = ray.get(r[0])
+    c.extend(r[1])
+    final_sorted = flatten(c)
+    assert final_sorted == ["Key2", "Key3", "Key4", "Key5"]
+
+
+def test_clean_flushed_local_edges():
+    graph = init_test()
+    key = "Key1"
+    vertex_data = "Value1"
+    local_edges = set()
+    foreign_edges = {}
+    transaction_id = 0
+    graph.insert.remote(key, vertex_data, local_edges, foreign_edges,
+                        transaction_id)
+    graph.add_local_edges.remote(transaction_id, key, "Key02", "Key03",
+                                 "Key14", "Key06", "Key07", "Key18",
+                                 "Key19", "Key10", "Key12", "Key11")
+    graph.add_local_edges.remote(transaction_id, key, "Key15", "Key13",
+                                 "Key05", "Key04", "Key09", "Key08",
+                                 "Key24", "Key21", "Key17", "Key20", "Key16")
+    graph.add_local_edges.remote(transaction_id, key, "Key23", "Key22")
+
+    r = ray.get(graph.select_local_edges.remote(transaction_id, key))
+    c = ray.get(r[0])
+    c.extend(r[1])
+    final = flatten(c)
+    assert final == ["Key02", "Key03", "Key06", "Key07", "Key10",
+                     "Key11", "Key12", "Key14", "Key18", "Key19", "Key04",
+                     "Key05", "Key08", "Key09", "Key13", "Key15",
+                     "Key16", "Key17", "Key20", "Key21", "Key24", "Key23",
+                     "Key22"]
+    graph.clean_local_edges.remote("Key1")
+    r = ray.get(graph.select_local_edges.remote(transaction_id, key))
+    # print r
+    c = ray.get(r[0])
+    c.extend(r[1])
+    # print c
+    final_sorted = flatten(c)
+    # print final_sorted
+    assert final_sorted == ["Key02", "Key03", "Key04", "Key05", "Key06", "Key07",
+                     "Key08", "Key09", "Key10", "Key11", "Key12", "Key13", "Key14",
+                     "Key15", "Key16", "Key17", "Key18", "Key19", "Key20",
+                     "Key21", "Key24", "Key23", "Key22"]
 
 
 def flatten(x):
