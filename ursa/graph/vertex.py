@@ -163,9 +163,11 @@ class _Vertex(object):
         return self.vertex_data is not None
 
     def clean_local_edges(self):
+        """Sorts and removes duplicates from all the local edges for a given vertex.
+
+        @return: A new _Vertex object with globally sorted local edges.
+        """
         new_local_edges = self.local_edges.merge_common_partitions()
-        # print self.local_edges.buf
-        # print ray.get(new_local_edges)
         return self.copy(local_edges=new_local_edges)
 
 

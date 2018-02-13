@@ -1,7 +1,7 @@
 import ursa
 import pytest
 import ray
-import collections
+from test_utils import flatten
 
 ray.init()
 
@@ -316,13 +316,3 @@ def test_clean_flushed_local_edges():
                             "Key12", "Key13", "Key14", "Key15", "Key16",
                             "Key17", "Key18", "Key19", "Key20", "Key21",
                             "Key24", "Key23", "Key22"]
-
-
-def flatten(x):
-    result = []
-    for el in x:
-        if isinstance(x, collections.Iterable) and not isinstance(el, str):
-            result.extend(flatten(el))
-        else:
-            result.append(el)
-    return result

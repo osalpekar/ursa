@@ -104,8 +104,8 @@ ENV/
 .idea/
 *.iml
 
-#vim swap files
+# vim swap files
 *.swp
 
-#macOS files
+# macOS files
 .DS_Store
